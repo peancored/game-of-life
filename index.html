@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title></title>
+
+  <style>
+    html, body {
+      height: 100%;
+      width: 100%;
+      margin: 0;
+    }
+
+    body {
+      display: flex;
+    }
+
+    #canvas {
+      height: 100%;
+      flex-shrink: 1;
+      min-width: 0;
+      width: 100%;
+    }
+
+    .state {
+      top: 0;
+      left: 0;
+      position: fixed;
+      height: 3px;
+      width: calc(100%);
+      background: #2ecc71;
+      opacity: 0.7;
+      transition: background .2s ease-in-out;
+    }
+
+    .state--paused {
+      background: #e74c3c;
+    }
+
+    .patterns {
+      display: none;
+      width: 10%;
+      flex-shrink: 0;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+
+  <div class="patterns"></div>
+  <div id="state" class="state state--paused"></div>
+
+  <script type="module" src="./src/index.js"></script>
+</body>
+</html>
