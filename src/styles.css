@@ -1,0 +1,70 @@
+html, body {
+	height: 100%;
+	width: 100%;
+	margin: 0;
+}
+
+body {
+	display: flex;
+}
+
+* {
+	box-sizing: border-box;
+}
+
+#canvas {
+	height: 100%;
+	flex-shrink: 1;
+	min-width: 0;
+	width: 100%;
+}
+
+.state {
+	top: 0;
+	left: 0;
+	position: fixed;
+	height: 3px;
+	width: calc(100%);
+	background: #2ecc71;
+	opacity: 0.7;
+	transition: background .2s ease-in-out;
+}
+
+.state--paused {
+	background: #e74c3c;
+}
+
+.patterns {
+	width: 20%;
+	flex-shrink: 0;
+	text-align: center;
+	color: #ecf0f1;
+	background: #222;
+	overflow-y: scroll;
+	padding-top: 10px;
+}
+
+.patterns h1 {
+	font-family: 'Arial', sans-serif;
+	margin: 0;
+}
+
+.pattern__name {
+	text-overflow: ellipsis;
+	max-width: 100%;
+	overflow: hidden;
+}
+
+.pattern {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	border-bottom: 1px solid #333;
+	padding: 10px;
+}
+
+.pattern__image {
+	width: 80px;
+	height: 80px;
+	background: #1e272e;
+}

@@ -34,6 +34,7 @@
     "no-use-before-define": "off",
     "no-mixed-spaces-and-tabs": "off",
     "func-names": "off",
+    "no-continue": "off",
     "prettier/prettier": [
       "error",
       { "singleQuote": true, "tabWidth": 2, "semi": true, "trailingComma": "es5", "printWidth": 80, "useTabs": true }

@@ -3,6 +3,8 @@ import {
 	createShader,
 	createProgram,
 	hexToRgb,
+	parsePatternStr,
+	ROWS_NUM,
 } from './helpers.js';
 
 const canvas = document.querySelector('#canvas');
@@ -91,7 +93,6 @@ async function setupGl() {
 	gl.uniform3f(colorLocation, color.r, color.g, color.b);
 }
 
-const ROWS_NUM = 100;
 const GAP = 1;
 
 async function main() {
@@ -221,13 +222,55 @@ function game() {
 		}
 	};
 
+	canvas.addEventListener('dragover', (event) => {
+		const x = Math.floor((event.clientX - colOffset) / side);
+		const y = Math.floor((event.clientY - rowOffset) / side);
+
+		if (x > colsNum - 1 || y > ROWS_NUM - 1 || x < 0 || y < 0) {
+			return;
+		}
+
+		event.preventDefault();
+	});
+
+	function drawPattern(mouseX, mouseY, pattern) {
+		const x = Math.floor((mouseX - colOffset) / side);
+		const y = Math.floor((mouseY - rowOffset) / side);
+
+		const patternColumns = parseInt(pattern.column);
+		const patternRows = parseInt(pattern.row);
+
+		const patternMatrix = parsePatternStr(
+			pattern.code,
+			patternColumns,
+			patternRows
+		);
+
+		for (let i = 0; i < patternRows; i++) {
+			for (let j = 0; j < patternColumns; j++) {
+				setCell(
+					x + j - Math.floor(patternColumns / 2),
+					y + i - Math.floor(patternRows / 2),
+					patternMatrix[i][j]
+				);
+			}
+		}
+
+		draw();
+	}
+
+	canvas.addEventListener('drop', (event) => {
+		const pattern = JSON.parse(event.dataTransfer.getData('patternData'));
+		drawPattern(event.clientX, event.clientY, pattern);
+	});
+
 	canvas.addEventListener('mouseup', mouseUpListener);
 	canvas.addEventListener('mousemove', mouseMoveListener);
 	canvas.addEventListener('wheel', wheelListener);
 	canvas.addEventListener('mousedown', mouseDownListener);
 	document.addEventListener('keydown', keydownListener);
 
-	generateRandom();
+	// generateRandom();
 
 	function draw() {
 		gl.clear(gl.COLOR_BUFFER_BIT);
@@ -244,6 +287,13 @@ function game() {
 		const column = (x + colsNum) % colsNum;
 		const row = (y + ROWS_NUM) % ROWS_NUM;
 		return cells[colsNum * row + column];
+	}
+
+	function setCell(x, y, value) {
+		const column = (x + colsNum) % colsNum;
+		const row = (y + ROWS_NUM) % ROWS_NUM;
+		cells[colsNum * row + column] = value;
+		newCells[colsNum * row + column] = value;
 	}
 
 	function simulate() {

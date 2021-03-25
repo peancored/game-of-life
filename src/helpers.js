@@ -62,3 +62,40 @@ export function hexToRgb(hex) {
 		  }
 		: null;
 }
+
+export function parsePatternStr(patternStr, colsNum, rowsNum) {
+	const pattern = new Array(rowsNum);
+
+	for (let i = 0; i < pattern.length; i++) {
+		pattern[i] = new Array(colsNum).fill(0);
+	}
+
+	let i = 0;
+	let j = 0;
+
+	const matches = patternStr.match(/\d*(\w|\$|!)/g);
+
+	for (let m = 0; m < matches.length; m++) {
+		const number = parseInt(matches[m].match(/\d*/)) || 1;
+		const action = matches[m].match(/[ob$!]/)[0];
+
+		if (action === '$') {
+			i += number;
+			j = 0;
+			continue;
+		} else if (action === '!') {
+			return pattern;
+		}
+
+		const alive = action === 'o' ? 1 : 0;
+
+		for (let n = 0; n < number; n++) {
+			pattern[i][j] = alive;
+			j++;
+		}
+	}
+
+	return pattern;
+}
+
+export const ROWS_NUM = 100;
