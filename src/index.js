@@ -11,7 +11,7 @@ const canvas = document.querySelector('#canvas');
 const state = document.querySelector('#state');
 
 /** @type {WebGL2RenderingContext} */
-const gl = canvas.getContext('webgl2', { antialias: false });
+const gl = canvas.getContext('webgl2');
 
 let timeLocation;
 let colorLocation;
@@ -21,6 +21,9 @@ let mouseMoveListener;
 let mouseUpListener;
 let keydownListener;
 let wheelListener;
+let pointSizeLocation;
+let zoomLocation;
+let zoomOriginLocation;
 
 async function setupGl() {
 	const positionBuffer = gl.createBuffer();
@@ -60,7 +63,10 @@ async function setupGl() {
 		'iResolution'
 	);
 	timeLocation = gl.getUniformLocation(program, 'iTime');
+	pointSizeLocation = gl.getUniformLocation(program, 'uPointSize');
 	colorLocation = gl.getUniformLocation(program, 'uColor');
+	zoomLocation = gl.getUniformLocation(program, 'uZoom');
+	zoomOriginLocation = gl.getUniformLocation(program, 'uZoomOrigin');
 
 	gl.vertexAttribPointer(
 		positionAttributeLocation,
@@ -88,12 +94,14 @@ async function setupGl() {
 		gl.canvas.clientHeight
 	);
 	gl.uniform1f(timeLocation, 1);
+	// gl.uniformMatrix3fv(transformLocation, false, getTransform(0, 0));
+	gl.uniform1f(zoomLocation, 0);
 
 	const color = hexToRgb('#e74c3c');
 	gl.uniform3f(colorLocation, color.r * 1.2, color.g * 1.2, color.b * 1.2);
 }
 
-const GAP = 1;
+const GAP = 40 / ROWS_NUM;
 
 async function main() {
 	await setupGl();
@@ -104,25 +112,25 @@ async function main() {
 function game() {
 	let isMouseDown = false;
 
-	const side = Math.floor(gl.canvas.clientHeight / ROWS_NUM);
+	const side = gl.canvas.clientHeight / ROWS_NUM;
 	const colsNum = Math.floor(gl.canvas.clientWidth / side);
-	const rowOffset = Math.floor((gl.canvas.clientHeight - side * ROWS_NUM) / 2);
-	const colOffset = Math.floor((gl.canvas.clientWidth - side * colsNum) / 2);
+	const rowOffset = (gl.canvas.clientHeight - side * ROWS_NUM) / 2;
+	const colOffset = (gl.canvas.clientWidth - side * colsNum) / 2;
 
 	const squares = [];
 
 	let cells = new Array(ROWS_NUM * colsNum).fill(0);
 	const newCells = new Array(ROWS_NUM * colsNum).fill(0);
 
+	gl.uniform1f(pointSizeLocation, side - GAP);
+
 	for (let i = 0; i < ROWS_NUM; i++) {
 		for (let j = 0; j < colsNum; j++) {
-			const square = getSquare(
-				j * side + GAP + colOffset,
-				i * side + GAP + rowOffset,
-				side + j * side - GAP + colOffset,
-				side + i * side - GAP + rowOffset,
-				0
-			);
+			const square = [
+				side / 2 + j * side + colOffset,
+				side / 2 + i * side + rowOffset,
+				1,
+			];
 
 			squares.push(square);
 		}
@@ -130,7 +138,7 @@ function game() {
 
 	const coordinates = new Float32Array(squares.flat());
 
-	const trianglesCount = ROWS_NUM * colsNum * 2 * 3;
+	const trianglesCount = ROWS_NUM * colsNum;
 
 	let baseOpacity = 0;
 
@@ -171,11 +179,18 @@ function game() {
 			draw();
 		}
 	}
+	let currentOffsetX = 0;
+	let currentOffsetY = 0;
+	let scale = 1;
 
 	mouseDownListener = (event) => {
 		isMouseDown = true;
 
-		updateCell(event.clientX, event.clientY, event.shiftKey);
+		updateCell(
+			event.clientX / scale + currentOffsetX,
+			event.clientY / scale + currentOffsetY,
+			event.shiftKey
+		);
 	};
 
 	mouseUpListener = () => {
@@ -185,16 +200,65 @@ function game() {
 
 	mouseMoveListener = (event) => {
 		if (isMouseDown) {
-			updateCell(event.clientX, event.clientY, event.shiftKey);
+			updateCell(
+				event.clientX / scale + currentOffsetX,
+				event.clientY / scale + currentOffsetY,
+				event.shiftKey
+			);
 		}
 	};
 
+	const width = gl.canvas.clientWidth;
+	const height = gl.canvas.clientHeight;
+	let zoomCount = 0;
 	wheelListener = (event) => {
-		if (event.deltaY > 0 && baseOpacity > 0) {
-			baseOpacity -= 0.01;
-			draw();
-		} else if (event.deltaY < 0 && baseOpacity < 0.5) {
-			baseOpacity += 0.01;
+		if (event.shiftKey) {
+			if (event.deltaY > 0 && baseOpacity > 0) {
+				baseOpacity -= 0.01;
+				draw();
+			} else if (event.deltaY < 0 && baseOpacity < 0.5) {
+				baseOpacity += 0.01;
+				draw();
+			}
+		} else {
+			if (event.deltaY > 0 && zoomCount > 0) {
+				zoomCount -= 0.1;
+				currentOffsetX -=
+					(((2 * event.clientX) / width - 1) * Math.exp(zoomCount) - 1) /
+					(Math.exp(zoomCount) + 1);
+				currentOffsetY -=
+					(((2 * event.clientY) / height - 1) * Math.exp(zoomCount) - 1) /
+					(Math.exp(zoomCount) + 1);
+			} else if (event.deltaY < 0 && zoomCount < 3) {
+				zoomCount += 0.1;
+				currentOffsetX = Math.abs(-event.clientX * (Math.exp(zoomCount) - 1));
+				currentOffsetY = Math.abs(-event.clientY * (Math.exp(zoomCount) - 1));
+				// currentOffsetX =
+					// (((((2 * event.clientX) / width - 1) * Math.exp(zoomCount) - 1) /
+						// (Math.exp(zoomCount) + 1) +
+						// 1) *
+						// width) /
+					// 2;
+				// currentOffsetY =
+					// (((((2 * event.clientY) / height - 1) * Math.exp(zoomCount) - 1) /
+						// (Math.exp(zoomCount) + 1) +
+						// 1) *
+						// height) /
+					// 2;
+				scale = Math.exp(zoomCount);
+				console.log(scale);
+			}
+			console.log(currentOffsetX, currentOffsetY);
+
+			if (zoomCount < 0) {
+				zoomCount = 0;
+			} else if (zoomCount > 3) {
+				zoomCount = 3;
+			}
+
+			gl.uniform1f(zoomLocation, Math.exp(zoomCount) - 1);
+			gl.uniform2f(zoomOriginLocation, event.clientX, event.clientY);
+			gl.uniform1f(pointSizeLocation, (side - GAP) * Math.exp(zoomCount));
 			draw();
 		}
 	};
@@ -278,11 +342,11 @@ function game() {
 		gl.clear(gl.COLOR_BUFFER_BIT);
 
 		for (let i = 2; i < coordinates.length; i += 3) {
-			coordinates[i] = newCells[Math.floor(i / 18)] || baseOpacity;
+			coordinates[i] = newCells[Math.floor(i / 3)] || baseOpacity;
 		}
 
 		gl.bufferData(gl.ARRAY_BUFFER, coordinates, gl.STATIC_DRAW);
-		gl.drawArrays(gl.TRIANGLES, 0, trianglesCount);
+		gl.drawArrays(gl.POINTS, 0, trianglesCount);
 	}
 
 	function getCell(x, y) {
@@ -334,6 +398,15 @@ function game() {
 			setTimeout(simulate, 80);
 		}
 	}
+}
+
+function getTransform(tx, ty) {
+	// prettier-ignore
+	return [
+		1, 0, 0,
+		0, 1, 0,
+		tx, ty, 1
+	];
 }
 
 function getSquare(x, y, width, height, opacity) {

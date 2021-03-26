@@ -3,6 +3,7 @@ import patterns from './patterns-list.js';
 
 const patternsMenu = document.getElementById('patterns');
 const patternsContainer = document.getElementById('patterns-container');
+const sortSelect = document.getElementById('sort');
 const patternsSearch = document.getElementById('search');
 
 patternsMenu.addEventListener('mouseenter', () => {
@@ -22,6 +23,13 @@ patternsSearch.addEventListener('input', () => {
 	patternsContainer.innerHTML = getFilteredPatterns(patternsSearch.value);
 });
 
+sortSelect.addEventListener('change', () => {
+	patternsContainer.innerHTML = getFilteredPatterns(
+		patternsSearch.value,
+		sortSelect.value
+	);
+});
+
 window.dragStart = function (event) {
 	const patternData = patterns.find(
 		(pattern) => pattern.name === event.target.id
@@ -32,10 +40,26 @@ window.dragStart = function (event) {
 	patternsMenu.classList.remove('hover');
 };
 
-function getFilteredPatterns(name = '') {
+function getFilteredPatterns(name = '', orderBy = 'name') {
 	return patterns
 		.filter((p) => parseInt(p.row) < ROWS_NUM)
 		.filter((p) => p.name.includes(name))
+		.sort((a, b) => {
+			switch (orderBy) {
+				case 'size-asc':
+					return (
+						parseInt(a.row) * parseInt(a.column) -
+						parseInt(b.row) * parseInt(b.column)
+					);
+				case 'size-desc':
+					return (
+						parseInt(b.row) * parseInt(b.column) -
+						parseInt(a.row) * parseInt(a.column)
+					);
+				default:
+					return a.name.localeCompare(b.name);
+			}
+		})
 		.map(
 			(pattern) => `
 		<div id="${

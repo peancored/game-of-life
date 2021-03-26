@@ -19,11 +19,19 @@
       <h1>Patterns</h1>
       <div class="patterns__header__description">(drag and drop to the field)</div>
       <input id="search" class="patterns__search" type="text" placeholder="Search...">
+      <div class="patterns__sort__wrapper">
+        <div>Order by:</div>
+        <select id="sort" class="patterns__sort">
+          <option value="name">Name</option>
+          <option value="size-asc">Size (asc)</option>
+          <option value="size-desc">Size (desc)</option>
+        </select>
+      </div>
     </div>
     <div id="patterns-container"></div>
   </div>
 
-  <div id="state" class="state"></div>
+  <div id="state" class="state" hidden></div>
 
   <script type="module" src="./src/index.js"></script>
   <script type="module" src="./src/patterns.js"></script>
