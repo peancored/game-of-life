@@ -15,7 +15,7 @@ const gl = canvas.getContext('webgl2', { antialias: false });
 
 let timeLocation;
 let colorLocation;
-let isPaused = true;
+let isPaused = false;
 let mouseDownListener;
 let mouseMoveListener;
 let mouseUpListener;
@@ -89,8 +89,8 @@ async function setupGl() {
 	);
 	gl.uniform1f(timeLocation, 1);
 
-	const color = hexToRgb('#ecf0f1');
-	gl.uniform3f(colorLocation, color.r, color.g, color.b);
+	const color = hexToRgb('#e74c3c');
+	gl.uniform3f(colorLocation, color.r * 1.2, color.g * 1.2, color.b * 1.2);
 }
 
 const GAP = 1;
@@ -134,7 +134,7 @@ function game() {
 
 	let baseOpacity = 0;
 
-	const backgroundColorRgb = hexToRgb('#1e272e');
+	const backgroundColorRgb = hexToRgb('#222222');
 	gl.clearColor(
 		backgroundColorRgb.r,
 		backgroundColorRgb.g,
@@ -200,7 +200,7 @@ function game() {
 	};
 
 	keydownListener = (event) => {
-		if (event.key === 'p') {
+		if (event.key === 's') {
 			if (isPaused) {
 				state.classList.remove('state--paused');
 				isPaused = false;
@@ -270,7 +270,9 @@ function game() {
 	canvas.addEventListener('mousedown', mouseDownListener);
 	document.addEventListener('keydown', keydownListener);
 
-	// generateRandom();
+	generateRandom();
+
+	simulate();
 
 	function draw() {
 		gl.clear(gl.COLOR_BUFFER_BIT);
@@ -292,8 +294,10 @@ function game() {
 	function setCell(x, y, value) {
 		const column = (x + colsNum) % colsNum;
 		const row = (y + ROWS_NUM) % ROWS_NUM;
-		cells[colsNum * row + column] = value;
-		newCells[colsNum * row + column] = value;
+		if (!cells[colsNum * row + column]) {
+			cells[colsNum * row + column] = value;
+			newCells[colsNum * row + column] = value;
+		}
 	}
 
 	function simulate() {

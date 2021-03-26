@@ -5,18 +5,28 @@
   <title></title>
 
   <link rel="stylesheet" href="./src/styles.css">
+  <link rel="stylesheet" href="./src/cheatsheet.css">
 </head>
 <body>
   <canvas id="canvas"></canvas>
 
   <div id="patterns" class="patterns">
-    <h1>Patterns</h1>
+    <div class="patterns-handle">
+      Patterns
+    </div>
+
+    <div class="patterns__header">
+      <h1>Patterns</h1>
+      <div class="patterns__header__description">(drag and drop to the field)</div>
+      <input id="search" class="patterns__search" type="text" placeholder="Search...">
+    </div>
     <div id="patterns-container"></div>
   </div>
 
-  <div id="state" class="state state--paused"></div>
+  <div id="state" class="state"></div>
 
   <script type="module" src="./src/index.js"></script>
   <script type="module" src="./src/patterns.js"></script>
+  <script type="module" src="./src/cheatsheet.js"></script>
 </body>
 </html>
