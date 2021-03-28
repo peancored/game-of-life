@@ -30,6 +30,7 @@ class Game {
 		this.maxZoom = 10;
 
 		this.createCells();
+		console.log(this.colsNum * ROWS_NUM);
 	}
 
 	createCells() {
@@ -224,10 +225,10 @@ class Game {
 		if (event.shiftKey) {
 			if (event.deltaY > 0 && this.baseOpacity > 0) {
 				this.baseOpacity -= 0.01;
-				this.draw();
+				this.draw(false);
 			} else if (event.deltaY < 0 && this.baseOpacity < 0.5) {
 				this.baseOpacity += 0.01;
-				this.draw();
+				this.draw(false);
 			}
 		} else {
 			let zoomCount = 0;
