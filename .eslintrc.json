@@ -45,6 +45,7 @@
     "Module": "readonly",
     "dat": "readonly",
     "Stats": "readonly",
-    "ccallArrays": "readonly"
+    "ccallArrays": "readonly",
+    "glMatrix": "readonly"
   }
 }

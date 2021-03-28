@@ -4,8 +4,11 @@
   <meta charset="UTF-8">
   <title>Game Of Life</title>
 
-  <link rel="stylesheet" href="./src/styles.css">
-  <link rel="stylesheet" href="./src/cheatsheet.css">
+  <link rel="stylesheet" href="./src/styles/index.css">
+  <link rel="stylesheet" href="./src/styles/cheatsheet.css">
+  <script src="./libs/wasm-arrays.min.js"></script>
+  <script src="./libs/gl-matrix-min.js"></script>
+  <script src="./libs/stats.min.js"></script>
 </head>
 <body>
   <canvas id="canvas"></canvas>
@@ -36,5 +39,6 @@
   <script type="module" src="./src/index.js"></script>
   <script type="module" src="./src/patterns.js"></script>
   <script type="module" src="./src/cheatsheet.js"></script>
+  <script async src="src/wasm.js"></script>
 </body>
 </html>

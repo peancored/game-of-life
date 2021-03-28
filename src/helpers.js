@@ -98,4 +98,4 @@ export function parsePatternStr(patternStr, colsNum, rowsNum) {
 	return pattern;
 }
 
-export const ROWS_NUM = document.body.clientHeight;
+export const ROWS_NUM = Math.floor(document.body.clientHeight * 2.0);

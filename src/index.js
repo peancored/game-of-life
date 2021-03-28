@@ -6,300 +6,339 @@ import {
 	parsePatternStr,
 	ROWS_NUM,
 } from './helpers.js';
-
-const canvas = document.querySelector('#canvas');
-const state = document.querySelector('#state');
-
-/** @type {WebGL2RenderingContext} */
-const gl = canvas.getContext('webgl2');
-
-let timeLocation;
-let colorLocation;
-let isPaused = false;
-let mouseDownListener;
-let mouseMoveListener;
-let mouseUpListener;
-let keydownListener;
-let wheelListener;
-let pointSizeLocation;
-let zoomLocation;
-let zoomOriginLocation;
-
-async function setupGl() {
-	const positionBuffer = gl.createBuffer();
-	gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-
-	resizeCanvasToDisplaySize(gl.canvas, 1);
-
-	gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
-
-	gl.enable(gl.BLEND);
-	gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-
-	const vertexShaderSource = await fetch(
-		'./src/shaders/vertex.glsl'
-	).then((response) => response.text());
-	const fragmentShaderSource = await fetch(
-		'./src/shaders/fragment.glsl'
-	).then((response) => response.text());
-
-	const vertexShader = createShader(gl, gl.VERTEX_SHADER, vertexShaderSource);
-	const fragmentShader = createShader(
-		gl,
-		gl.FRAGMENT_SHADER,
-		fragmentShaderSource
-	);
-
-	const program = createProgram(gl, vertexShader, fragmentShader);
-	gl.useProgram(program);
-
-	const vao = gl.createVertexArray();
-	gl.bindVertexArray(vao);
-
-	const positionAttributeLocation = gl.getAttribLocation(program, 'aPosition');
-	const opacityAttributeLocation = gl.getAttribLocation(program, 'aOpacity');
-	const resolutionUniformLocation = gl.getUniformLocation(
-		program,
-		'iResolution'
-	);
-	timeLocation = gl.getUniformLocation(program, 'iTime');
-	pointSizeLocation = gl.getUniformLocation(program, 'uPointSize');
-	colorLocation = gl.getUniformLocation(program, 'uColor');
-	zoomLocation = gl.getUniformLocation(program, 'uZoom');
-	zoomOriginLocation = gl.getUniformLocation(program, 'uZoomOrigin');
-
-	gl.vertexAttribPointer(
-		positionAttributeLocation,
-		2,
-		gl.FLOAT,
-		false,
-		3 * Float32Array.BYTES_PER_ELEMENT,
-		0
-	);
-	gl.vertexAttribPointer(
-		opacityAttributeLocation,
-		1,
-		gl.FLOAT,
-		false,
-		3 * Float32Array.BYTES_PER_ELEMENT,
-		2 * Float32Array.BYTES_PER_ELEMENT
-	);
-
-	gl.enableVertexAttribArray(positionAttributeLocation);
-	gl.enableVertexAttribArray(opacityAttributeLocation);
-
-	gl.uniform2f(
-		resolutionUniformLocation,
-		gl.canvas.clientWidth,
-		gl.canvas.clientHeight
-	);
-	gl.uniform1f(timeLocation, 1);
-	// gl.uniformMatrix3fv(transformLocation, false, getTransform(0, 0));
-	gl.uniform1f(zoomLocation, 0);
-
-	const color = hexToRgb('#e74c3c');
-	gl.uniform3f(colorLocation, color.r * 1.2, color.g * 1.2, color.b * 1.2);
-}
+import Zoom from './zoom.js';
 
 const GAP = 40 / ROWS_NUM;
 
-async function main() {
-	await setupGl();
+class Game {
+	constructor() {
+		this.canvas = document.querySelector('#canvas');
+		this.state = document.querySelector('#state');
+		/** @type {WebGL2RenderingContext} */
+		this.gl = this.canvas.getContext('webgl2');
+		this.isPaused = false;
 
-	game();
-}
+		this.side = this.gl.canvas.clientHeight / ROWS_NUM;
+		this.colsNum = Math.floor(this.gl.canvas.clientWidth / this.side);
+		this.rowOffset = (this.gl.canvas.clientHeight - this.side * ROWS_NUM) / 2;
+		this.colOffset =
+			(this.gl.canvas.clientWidth - this.side * this.colsNum) / 2;
 
-function game() {
-	let isMouseDown = false;
+		this.isMouseDown = false;
+		this.baseOpacity = 0;
+		this.currentZoomCount = 0;
+		this.maxZoom = 10;
 
-	const side = gl.canvas.clientHeight / ROWS_NUM;
-	const colsNum = Math.floor(gl.canvas.clientWidth / side);
-	const rowOffset = (gl.canvas.clientHeight - side * ROWS_NUM) / 2;
-	const colOffset = (gl.canvas.clientWidth - side * colsNum) / 2;
-
-	const squares = [];
-
-	let cells = new Array(ROWS_NUM * colsNum).fill(0);
-	const newCells = new Array(ROWS_NUM * colsNum).fill(0);
-
-	gl.uniform1f(pointSizeLocation, side - GAP);
-
-	for (let i = 0; i < ROWS_NUM; i++) {
-		for (let j = 0; j < colsNum; j++) {
-			const square = [
-				side / 2 + j * side + colOffset,
-				side / 2 + i * side + rowOffset,
-				1,
-			];
-
-			squares.push(square);
-		}
+		this.createCells();
 	}
 
-	const coordinates = new Float32Array(squares.flat());
+	createCells() {
+		this.coordinates = new Float32Array(ROWS_NUM * this.colsNum * 3);
 
-	const trianglesCount = ROWS_NUM * colsNum;
-
-	let baseOpacity = 0;
-
-	const backgroundColorRgb = hexToRgb('#222222');
-	gl.clearColor(
-		backgroundColorRgb.r,
-		backgroundColorRgb.g,
-		backgroundColorRgb.b,
-		1.0
-	);
-
-	draw();
-
-	let prevCellIndex;
-
-	function generateRandom() {
-		for (let i = 0; i < cells.length; i++) {
-			cells[i] = Math.random() < 0.7 ? 0 : 1;
-			newCells[i] = cells[i];
-		}
-		draw();
-	}
-
-	function updateCell(mouseX, mouseY, shift) {
-		const x = Math.floor((mouseX - colOffset) / side);
-		const y = Math.floor((mouseY - rowOffset) / side);
-
-		if (x > colsNum - 1 || y > ROWS_NUM - 1 || x < 0 || y < 0) {
-			return;
-		}
-
-		const index = colsNum * y + x;
-
-		if (prevCellIndex !== index) {
-			cells[index] = shift ? 0 : 1;
-			newCells[index] = cells[index];
-			prevCellIndex = index;
-			draw();
-		}
-	}
-	let currentOffsetX = 0;
-	let currentOffsetY = 0;
-	let scale = 1;
-
-	mouseDownListener = (event) => {
-		isMouseDown = true;
-
-		updateCell(
-			event.clientX / scale + currentOffsetX,
-			event.clientY / scale + currentOffsetY,
-			event.shiftKey
+		Module.ccall(
+			'setup',
+			null,
+			['number', 'number', 'number', 'number', 'number'],
+			[this.colsNum, ROWS_NUM, this.side, this.colOffset, this.rowOffset]
 		);
-	};
+	}
 
-	mouseUpListener = () => {
-		isMouseDown = false;
-		prevCellIndex = -1;
-	};
+	async setupGl() {
+		const positionBuffer = this.gl.createBuffer();
+		this.gl.bindBuffer(this.gl.ARRAY_BUFFER, positionBuffer);
 
-	mouseMoveListener = (event) => {
-		if (isMouseDown) {
-			updateCell(
-				event.clientX / scale + currentOffsetX,
-				event.clientY / scale + currentOffsetY,
-				event.shiftKey
-			);
+		resizeCanvasToDisplaySize(this.gl.canvas, 1);
+
+		this.gl.viewport(0, 0, this.gl.canvas.width, this.gl.canvas.height);
+
+		this.gl.enable(this.gl.BLEND);
+		this.gl.blendFunc(this.gl.SRC_ALPHA, this.gl.ONE_MINUS_SRC_ALPHA);
+
+		const vertexShaderSource = await fetch(
+			'./src/shaders/vertex.glsl'
+		).then((response) => response.text());
+		const fragmentShaderSource = await fetch(
+			'./src/shaders/fragment.glsl'
+		).then((response) => response.text());
+
+		const vertexShader = createShader(
+			this.gl,
+			this.gl.VERTEX_SHADER,
+			vertexShaderSource
+		);
+		const fragmentShader = createShader(
+			this.gl,
+			this.gl.FRAGMENT_SHADER,
+			fragmentShaderSource
+		);
+
+		const program = createProgram(this.gl, vertexShader, fragmentShader);
+		this.gl.useProgram(program);
+
+		const vao = this.gl.createVertexArray();
+		this.gl.bindVertexArray(vao);
+
+		const positionAttributeLocation = this.gl.getAttribLocation(
+			program,
+			'aPosition'
+		);
+		const opacityAttributeLocation = this.gl.getAttribLocation(
+			program,
+			'aOpacity'
+		);
+		const resolutionUniformLocation = this.gl.getUniformLocation(
+			program,
+			'iResolution'
+		);
+		this.timeLocation = this.gl.getUniformLocation(program, 'iTime');
+		this.pointSizeLocation = this.gl.getUniformLocation(program, 'uPointSize');
+		this.colorLocation = this.gl.getUniformLocation(program, 'uColor');
+		this.zoomLocation = this.gl.getUniformLocation(program, 'uZoom');
+		this.zoomOriginLocation = this.gl.getUniformLocation(
+			program,
+			'uZoomOrigin'
+		);
+		this.matrixLocation = this.gl.getUniformLocation(program, 'uMatrix');
+
+		this.gl.vertexAttribPointer(
+			positionAttributeLocation,
+			2,
+			this.gl.FLOAT,
+			false,
+			3 * Float32Array.BYTES_PER_ELEMENT,
+			0
+		);
+		this.gl.vertexAttribPointer(
+			opacityAttributeLocation,
+			1,
+			this.gl.FLOAT,
+			false,
+			3 * Float32Array.BYTES_PER_ELEMENT,
+			2 * Float32Array.BYTES_PER_ELEMENT
+		);
+
+		this.gl.enableVertexAttribArray(positionAttributeLocation);
+		this.gl.enableVertexAttribArray(opacityAttributeLocation);
+
+		this.gl.uniform2f(
+			resolutionUniformLocation,
+			this.gl.canvas.clientWidth,
+			this.gl.canvas.clientHeight
+		);
+		this.gl.uniform1f(this.timeLocation, 1);
+		this.gl.uniform1f(this.zoomLocation, 1);
+
+		const color = hexToRgb('#e74c3c');
+		this.gl.uniform3f(
+			this.colorLocation,
+			color.r * 1.2,
+			color.g * 1.2,
+			color.b * 1.2
+		);
+
+		this.zoom = new Zoom(
+			this.gl.canvas.clientWidth,
+			this.gl.canvas.clientHeight
+		);
+
+		this.gl.uniformMatrix3fv(
+			this.matrixLocation,
+			false,
+			this.zoom.getFinalMatrix()
+		);
+
+		this.gl.uniform1f(this.pointSizeLocation, this.side - GAP);
+	}
+
+	async main() {
+		await this.setupGl();
+
+		this.stats = new Stats();
+		this.stats.showPanel(0);
+		document.body.appendChild(this.stats.dom);
+
+		this.game();
+	}
+
+	game() {
+		const backgroundColorRgb = hexToRgb('#222222');
+		this.gl.clearColor(
+			backgroundColorRgb.r,
+			backgroundColorRgb.g,
+			backgroundColorRgb.b,
+			1.0
+		);
+
+		this.draw();
+
+		this.setupListeners();
+
+		this.generateRandom();
+
+		this.simulate();
+	}
+
+	setupListeners() {
+		this.canvas.addEventListener('dragover', this.dragoverListener.bind(this));
+		this.canvas.addEventListener('drop', this.dropListener.bind(this));
+		this.canvas.addEventListener('mouseup', this.mouseUpListener.bind(this));
+		this.canvas.addEventListener(
+			'mousemove',
+			this.mouseMoveListener.bind(this)
+		);
+		this.canvas.addEventListener('wheel', this.wheelListener.bind(this));
+		this.canvas.addEventListener(
+			'mousedown',
+			this.mouseDownListener.bind(this)
+		);
+		document.addEventListener('keydown', this.keydownListener.bind(this));
+		document.addEventListener('keyup', this.keyupListener.bind(this));
+	}
+
+	keyupListener(event) {
+		if (!event.ctrlKey) {
+			this.canvas.style.cursor = 'default';
 		}
-	};
+	}
 
-	const width = gl.canvas.clientWidth;
-	const height = gl.canvas.clientHeight;
-	let zoomCount = 0;
-	wheelListener = (event) => {
-		if (event.shiftKey) {
-			if (event.deltaY > 0 && baseOpacity > 0) {
-				baseOpacity -= 0.01;
-				draw();
-			} else if (event.deltaY < 0 && baseOpacity < 0.5) {
-				baseOpacity += 0.01;
-				draw();
-			}
-		} else {
-			if (event.deltaY > 0 && zoomCount > 0) {
-				zoomCount -= 0.1;
-				currentOffsetX -=
-					(((2 * event.clientX) / width - 1) * Math.exp(zoomCount) - 1) /
-					(Math.exp(zoomCount) + 1);
-				currentOffsetY -=
-					(((2 * event.clientY) / height - 1) * Math.exp(zoomCount) - 1) /
-					(Math.exp(zoomCount) + 1);
-			} else if (event.deltaY < 0 && zoomCount < 3) {
-				zoomCount += 0.1;
-				currentOffsetX = Math.abs(-event.clientX * (Math.exp(zoomCount) - 1));
-				currentOffsetY = Math.abs(-event.clientY * (Math.exp(zoomCount) - 1));
-				// currentOffsetX =
-					// (((((2 * event.clientX) / width - 1) * Math.exp(zoomCount) - 1) /
-						// (Math.exp(zoomCount) + 1) +
-						// 1) *
-						// width) /
-					// 2;
-				// currentOffsetY =
-					// (((((2 * event.clientY) / height - 1) * Math.exp(zoomCount) - 1) /
-						// (Math.exp(zoomCount) + 1) +
-						// 1) *
-						// height) /
-					// 2;
-				scale = Math.exp(zoomCount);
-				console.log(scale);
-			}
-			console.log(currentOffsetX, currentOffsetY);
+	dragoverListener(event) {
+		const x = Math.floor((event.clientX - this.colOffset) / this.side);
+		const y = Math.floor((event.clientY - this.rowOffset) / this.side);
 
-			if (zoomCount < 0) {
-				zoomCount = 0;
-			} else if (zoomCount > 3) {
-				zoomCount = 3;
-			}
-
-			gl.uniform1f(zoomLocation, Math.exp(zoomCount) - 1);
-			gl.uniform2f(zoomOriginLocation, event.clientX, event.clientY);
-			gl.uniform1f(pointSizeLocation, (side - GAP) * Math.exp(zoomCount));
-			draw();
-		}
-	};
-
-	keydownListener = (event) => {
-		if (event.key === 's') {
-			if (isPaused) {
-				state.classList.remove('state--paused');
-				isPaused = false;
-				simulate();
-			} else {
-				state.classList.add('state--paused');
-				isPaused = true;
-			}
-		} else if (event.key === 'r') {
-			generateRandom();
-		} else if (event.key === 'c') {
-			for (let i = 0; i < cells.length; i++) {
-				cells[i] = 0;
-				newCells[i] = cells[i];
-			}
-			draw();
-			state.classList.add('state--paused');
-			isPaused = true;
-		}
-	};
-
-	canvas.addEventListener('dragover', (event) => {
-		const x = Math.floor((event.clientX - colOffset) / side);
-		const y = Math.floor((event.clientY - rowOffset) / side);
-
-		if (x > colsNum - 1 || y > ROWS_NUM - 1 || x < 0 || y < 0) {
+		if (x > this.colsNum - 1 || y > ROWS_NUM - 1 || x < 0 || y < 0) {
 			return;
 		}
 
 		event.preventDefault();
-	});
+	}
 
-	function drawPattern(mouseX, mouseY, pattern) {
-		const x = Math.floor((mouseX - colOffset) / side);
-		const y = Math.floor((mouseY - rowOffset) / side);
+	dropListener(event) {
+		const pattern = JSON.parse(event.dataTransfer.getData('patternData'));
+		this.drawPattern(
+			...this.zoom.getTrueMouseCoords(event.clientX, event.clientY),
+			pattern
+		);
+	}
+
+	wheelListener(event) {
+		if (event.shiftKey) {
+			if (event.deltaY > 0 && this.baseOpacity > 0) {
+				this.baseOpacity -= 0.01;
+				this.draw();
+			} else if (event.deltaY < 0 && this.baseOpacity < 0.5) {
+				this.baseOpacity += 0.01;
+				this.draw();
+			}
+		} else {
+			let zoomCount = 0;
+
+			if (event.deltaY > 0 && this.currentZoomCount > 0) {
+				zoomCount = -0.4;
+				this.currentZoomCount -= 1;
+			} else if (event.deltaY < 0 && this.currentZoomCount < this.maxZoom) {
+				zoomCount = 0.4;
+				this.currentZoomCount += 1;
+			}
+
+			const scale = Math.exp(zoomCount);
+
+			this.zoom.calcTransform(event.clientX, event.clientY, scale);
+			this.zoom.offsetCorners();
+
+			this.gl.uniformMatrix3fv(
+				this.matrixLocation,
+				false,
+				this.zoom.getFinalMatrix()
+			);
+			this.gl.uniform1f(
+				this.zoomLocation,
+				Math.exp(this.currentZoomCount * 0.4)
+			);
+			this.gl.uniform2f(this.zoomOriginLocation, event.clientX, event.clientY);
+
+			this.draw(false);
+		}
+	}
+
+	keydownListener(event) {
+		if (event.key === 's') {
+			if (this.isPaused) {
+				this.state.classList.remove('state--paused');
+				this.isPaused = false;
+				this.simulate();
+			} else {
+				this.state.classList.add('state--paused');
+				this.isPaused = true;
+			}
+		} else if (event.key === 'r') {
+			this.generateRandom();
+		} else if (event.key === 'c') {
+			Module.ccall('clear', null, null, null);
+			this.draw();
+			this.state.classList.add('state--paused');
+			this.isPaused = true;
+		}
+
+		if (event.ctrlKey && this.canvas.style.cursor === 'default') {
+			this.canvas.style.cursor = 'grab';
+		}
+	}
+
+	mouseDownListener(event) {
+		this.isMouseDown = true;
+
+		if (!event.ctrlKey) {
+			this.updateCell(
+				...this.zoom.getTrueMouseCoords(event.clientX, event.clientY),
+				event.shiftKey
+			);
+		} else {
+			this.currentMousePosition = this.zoom.getProjectedMouse(
+				event.clientX,
+				event.clientY
+			);
+			this.canvas.style.cursor = 'grabbing';
+		}
+	}
+
+	mouseUpListener() {
+		this.isMouseDown = false;
+		this.prevCellIndex = -1;
+		this.canvas.style.cursor = 'default';
+	}
+
+	mouseMoveListener(event) {
+		if (this.isMouseDown) {
+			if (!event.ctrlKey) {
+				this.updateCell(
+					...this.zoom.getTrueMouseCoords(event.clientX, event.clientY),
+					event.shiftKey
+				);
+			} else {
+				this.zoom.calcMove(
+					this.zoom.getProjectedMouse(event.clientX, event.clientY),
+					this.currentMousePosition
+				);
+				this.currentMousePosition = this.zoom.getProjectedMouse(
+					event.clientX,
+					event.clientY
+				);
+
+				this.zoom.offsetCorners();
+
+				this.gl.uniformMatrix3fv(
+					this.matrixLocation,
+					false,
+					this.zoom.getFinalMatrix()
+				);
+				this.draw(false);
+			}
+		}
+	}
+
+	drawPattern(mouseX, mouseY, pattern) {
+		const x = Math.floor((mouseX - this.colOffset) / this.side);
+		const y = Math.floor((mouseY - this.rowOffset) / this.side);
 
 		const patternColumns = parseInt(pattern.column);
 		const patternRows = parseInt(pattern.row);
@@ -312,7 +351,7 @@ function game() {
 
 		for (let i = 0; i < patternRows; i++) {
 			for (let j = 0; j < patternColumns; j++) {
-				setCell(
+				this.setCell(
 					x + j - Math.floor(patternColumns / 2),
 					y + i - Math.floor(patternRows / 2),
 					patternMatrix[i][j]
@@ -320,105 +359,85 @@ function game() {
 			}
 		}
 
-		draw();
+		this.draw();
 	}
 
-	canvas.addEventListener('drop', (event) => {
-		const pattern = JSON.parse(event.dataTransfer.getData('patternData'));
-		drawPattern(event.clientX, event.clientY, pattern);
-	});
+	updateCell(mouseX, mouseY, shift) {
+		const x = Math.floor((mouseX - this.colOffset) / this.side);
+		const y = Math.floor((mouseY - this.rowOffset) / this.side);
 
-	canvas.addEventListener('mouseup', mouseUpListener);
-	canvas.addEventListener('mousemove', mouseMoveListener);
-	canvas.addEventListener('wheel', wheelListener);
-	canvas.addEventListener('mousedown', mouseDownListener);
-	document.addEventListener('keydown', keydownListener);
-
-	generateRandom();
-
-	simulate();
-
-	function draw() {
-		gl.clear(gl.COLOR_BUFFER_BIT);
-
-		for (let i = 2; i < coordinates.length; i += 3) {
-			coordinates[i] = newCells[Math.floor(i / 3)] || baseOpacity;
+		if (x > this.colsNum - 1 || y > ROWS_NUM - 1 || x < 0 || y < 0) {
+			return;
 		}
 
-		gl.bufferData(gl.ARRAY_BUFFER, coordinates, gl.STATIC_DRAW);
-		gl.drawArrays(gl.POINTS, 0, trianglesCount);
+		const index = this.colsNum * y + x;
+
+		if (this.prevCellIndex !== index) {
+			this.prevCellIndex = index;
+			Module.ccall(
+				'updateAt',
+				null,
+				['number', 'number'],
+				[index, shift ? 0 : 1]
+			);
+			this.draw();
+		}
 	}
 
-	function getCell(x, y) {
-		const column = (x + colsNum) % colsNum;
+	generateRandom() {
+		Module.ccall('randomize', null, null, null);
+		this.draw();
+	}
+
+	setCell(x, y, value) {
+		const column = (x + this.colsNum) % this.colsNum;
 		const row = (y + ROWS_NUM) % ROWS_NUM;
-		return cells[colsNum * row + column];
+		Module.ccall(
+			'updateAt',
+			null,
+			['number', 'number'],
+			[this.colsNum * row + column, value]
+		);
 	}
 
-	function setCell(x, y, value) {
-		const column = (x + colsNum) % colsNum;
-		const row = (y + ROWS_NUM) % ROWS_NUM;
-		if (!cells[colsNum * row + column]) {
-			cells[colsNum * row + column] = value;
-			newCells[colsNum * row + column] = value;
+	draw(calculate = true) {
+		this.gl.clear(this.gl.COLOR_BUFFER_BIT);
+
+		if (calculate) {
+			ccallArrays('updateCoordinates', 'array', null, null, {
+				heapOut: 'HEAPF32',
+				returnArraySize: ROWS_NUM * this.colsNum * 3,
+				resultArray: this.coordinates,
+			});
+
+			this.gl.bufferData(
+				this.gl.ARRAY_BUFFER,
+				this.coordinates,
+				this.gl.STATIC_DRAW
+			);
 		}
+
+		this.gl.drawArrays(this.gl.POINTS, 0, ROWS_NUM * this.colsNum);
 	}
 
-	function simulate() {
-		for (let i = 0; i < cells.length; i++) {
-			const column = i % colsNum;
-			const row = Math.floor(i / colsNum);
+	simulate() {
+		this.stats.begin();
 
-			const sum =
-				!!getCell(column - 1, row - 1) +
-				!!getCell(column, row - 1) +
-				!!getCell(column + 1, row - 1) +
-				!!getCell(column - 1, row) +
-				!!getCell(column + 1, row) +
-				!!getCell(column - 1, row + 1) +
-				!!getCell(column, row + 1) +
-				!!getCell(column + 1, row + 1);
+		Module.ccall('simulate', null, null, null);
 
-			if (sum === 3 && cells[i] === 0) {
-				newCells[i] = 1;
-			} else if (cells[i] === 1) {
-				if (sum < 2) {
-					newCells[i] = 0;
-				} else if (sum > 3) {
-					newCells[i] = 0;
-				}
-			}
-		}
+		this.draw();
 
-		cells = [...newCells];
+		this.stats.end();
 
-		draw();
-
-		if (!isPaused) {
-			setTimeout(simulate, 80);
+		if (!this.isPaused) {
+			// setTimeout(this.simulate.bind(this), 100);
+			requestAnimationFrame(this.simulate.bind(this));
 		}
 	}
 }
 
-function getTransform(tx, ty) {
-	// prettier-ignore
-	return [
-		1, 0, 0,
-		0, 1, 0,
-		tx, ty, 1
-	];
-}
+Module.onRuntimeInitialized = function () {
+	const game = new Game();
 
-function getSquare(x, y, width, height, opacity) {
-	// prettier-ignore
-	return [
-		x, y, opacity,
-		width, y, opacity,
-		x, height, opacity,
-		x, height, opacity,
-		width, y, opacity,
-		width, height, opacity
-	];
-}
-
-main();
+	game.main();
+};

@@ -10,5 +10,13 @@ uniform vec2 iResolution;
 uniform float iTime;
 
 void main() {
-	fragColor = vec4(uColor, colorAlpha);
+	if (colorAlpha == 0.0) {
+		fragColor = vec4(uColor, 0);
+	} else if (colorAlpha == 1.0) {
+		fragColor = vec4(.18, .80, .44, 1);
+	} else if (colorAlpha == 2.0) {
+		fragColor = vec4(.95, .77, .06, 1);
+	} else if (colorAlpha == 3.0) {
+		fragColor = vec4(uColor, 1);
+	}
 }
