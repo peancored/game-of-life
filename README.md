@@ -7,6 +7,8 @@
 ## Demo
 Check out the live demo [here](https://peancored.github.io/game-of-life/).
 
+**WARNING**: The link might not work when opened for the first time, simply reload the page and it should load correctly.
+
 ## Overview
 This project is a WebGL- and WebAssembly-powered implementation of Conway's Game of Life. Leveraging these technologies allows the simulation to handle high-cardinality grids with impressive performance and visuals.
 
