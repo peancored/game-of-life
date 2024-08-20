@@ -1,7 +1,11 @@
 # Conway's Game of Life - WebGL & WebAssembly Version
 
+<img width="500" alt="image" src="https://github.com/user-attachments/assets/d1c4a78c-f494-4b2a-b6b2-eea6432812d0">
+<img width="500" alt="image" src="https://github.com/user-attachments/assets/951e8ec7-ff93-41ca-899f-e4d081e01329">
+
+
 ## Demo
-Check out the live demo [here](#).
+Check out the live demo [here](https://peancored.github.io/game-of-life/).
 
 ## Overview
 This project is a WebGL- and WebAssembly-powered implementation of Conway's Game of Life. Leveraging these technologies allows the simulation to handle high-cardinality grids with impressive performance and visuals.
