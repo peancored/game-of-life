@@ -18,10 +18,8 @@ This project is a WebGL- and WebAssembly-powered implementation of Conway's Game
 1. **Clear the Screen:** Press `c` to clear the grid.
 2. **Drag and Drop Patterns:** Select a pattern from the side panel on the right and drag it onto the grid.
 3. **Start the Simulation:** Press `s` to start the simulation and watch the patterns evolve.
+4. **Check the cheatsheet** for even more cool stuff.
 
 ## Technologies Used
 - **WebGL**: For rendering the grid and patterns with high performance.
 - **WebAssembly (WASM)**: For handling the complex calculations required by the simulation.
-
-## License
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
